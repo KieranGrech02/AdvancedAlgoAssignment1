@@ -29,106 +29,55 @@ public class CartesianTree
         Root = array.Length > 0 ? BuildCartesianTree() : null;
     }
 
-    // Build Cartesian Tree (Index-array method)
+    // Build Stack-Based Cartesian Tree
     private TreeNode? BuildCartesianTree()
     {
-        int n = _array.Length;
-        int[] parent = new int[n];
-        int[] leftchild = new int[n];
-        int[] rightchild = new int[n];
-
-        for (int i = 0; i < n; i++)
-        {
-            parent[i] = -1;
-            leftchild[i] = -1;
-            rightchild[i] = -1;
-        }
-
-        int root = 0;
-
-        for (int i = 1; i < n; i++)
-        {
-            int last = i - 1;
-            rightchild[i] = -1;
-
-            while (_array[last] >= _array[i] && last != root)
-                last = parent[last];
-
-            if (_array[last] >= _array[i])
-            {
-                parent[root] = i;
-                leftchild[i] = root;
-                root = i;
-            }
-            else if (rightchild[last] == -1)
-            {
-                rightchild[last] = i;
-                parent[i] = last;
-                leftchild[i] = -1;
-            }
-            else
-            {
-                parent[rightchild[last]] = i;
-                leftchild[i] = rightchild[last];
-                rightchild[last] = i;
-                parent[i] = last;
-            }
-        }
-
-        parent[root] = -1;
-        return BuildTreeUtil(root, parent, leftchild, rightchild);
-    }
-
-    private TreeNode? BuildTreeUtil(int rootIdx, int[] parent, int[] leftchild, int[] rightchild)
-    {
-        if (rootIdx == -1) return null;
-
-        TreeNode node = new TreeNode(_array[rootIdx], rootIdx);
-        node.Left = BuildTreeUtil(leftchild[rootIdx], parent, leftchild, rightchild);
-        node.Right = BuildTreeUtil(rightchild[rootIdx], parent, leftchild, rightchild);
-
-        return node;
-    }
-
-    // Stack-Based Cartesian Tree
-    public TreeNode? BuildStackBased()
-    {
+        // empty array edge case
         if (_array.Length == 0) return null;
 
+        // Stack maintains nodes in increasing order by value
         Stack<TreeNode> stack = new Stack<TreeNode>();
         TreeNode? root = null;
 
+        // Process each element left to right
         for (int idx = 0; idx < _array.Length; idx++)
         {
+            // Create new node for current element
             TreeNode current = new TreeNode(_array[idx], idx);
             TreeNode? lastPopped = null;
 
+            // Pop all nodes with value >= current (maintain min-heap property)
+            // These nodes will become the left subtree of current
             while (stack.Count > 0 && stack.Peek().Value >= current.Value)
             {
                 lastPopped = stack.Pop();
             }
 
+            // If stack not empty, current becomes right child of stack top
+            // (maintains BST index property: parent index < current index)
             if (stack.Count > 0)
             {
                 stack.Peek().Right = current;
             }
             else
             {
+                // Stack is empty, so current has smallest value seen so far
+                // It becomes the new root
                 root = current;
             }
 
+            // All popped nodes become left child of current
+            // (maintains index property: they all come before current)
             if (lastPopped != null)
             {
                 current.Left = lastPopped;
             }
 
+            // Push current node to maintain stack invariant
             stack.Push(current);
         }
 
-        while (root != null && root.Left != null)
-            root = root.Left;
-
-        return root ?? (stack.Count > 0 ? stack.Peek() : null);
+        return root;
     }
 
     // Traversals
@@ -142,9 +91,9 @@ public class CartesianTree
     private void InOrder(TreeNode? node, List<(int, int)> result)
     {
         if (node == null) return;
-        InOrder(node.Left, result);
-        result.Add((node.Value, node.Index));
-        InOrder(node.Right, result);
+        InOrder(node.Left, result);  // goto left subtree
+        result.Add((node.Value, node.Index));  // goto current node
+        InOrder(node.Right, result);  // goto right subtree
     }
 
     public List<(int value, int index)> PreOrder()
@@ -154,15 +103,18 @@ public class CartesianTree
         return result;
     }
 
+    // Used in testing
     private void PreOrder(TreeNode? node, List<(int, int)> result)
     {
-        if (node == null) return;
-        result.Add((node.Value, node.Index));
-        PreOrder(node.Left, result);
-        PreOrder(node.Right, result);
+        if (node == null) {
+            return;
+        }
+        result.Add((node.Value, node.Index));  // goto current node first
+        PreOrder(node.Left, result);  // goto left subtree
+        PreOrder(node.Right, result);  // goto right subtree
     }
 
-    // Print Tree
+    // Print Tree for a nicer output of the code
     public void PrintTree()
     {
         PrintTree(Root, 0, "Root: ");
@@ -199,16 +151,20 @@ public class CartesianTree
     {
         if (node == null) return null;
 
+        // If current node's index is in range, LCA (lowest common ancestor)
+        // Due to min-heap property, node has the minimum value in the range
         if (left <= node.Index && node.Index <= right)
             return node;
 
+        // Range is entirely to the left
         if (node.Index > right)
             return FindLca(node.Left, left, right);
         else
+            // Range is entirely to the right
             return FindLca(node.Right, left, right);
     }
 
-    // Verify Properties
+    // Verify (Used in tests)
     public (bool allOk, bool heapOk, bool bstOk) VerifyProperties()
     {
         bool heapOk = CheckHeap(Root);
@@ -218,40 +174,41 @@ public class CartesianTree
 
     private bool CheckHeap(TreeNode? node)
     {
-        if (node == null) return true;
-        if (node.Left != null && node.Left.Value < node.Value) return false;
-        if (node.Right != null && node.Right.Value < node.Value) return false;
+        if (node == null) {
+            return true;
+        }
+        // Parent must be <= both children (min-heap property)
+        if (node.Left != null && node.Left.Value < node.Value) {
+            return false;
+        }
+        if (node.Right != null && node.Right.Value < node.Value) {
+            return false;
+        }
+        // Recursively check all subtrees
         return CheckHeap(node.Left) && CheckHeap(node.Right);
     }
 
     private bool CheckBstIndices(TreeNode? node, int minIdx, int maxIdx)
     {
-        if (node == null) return true;
-        if (node.Index <= minIdx || node.Index >= maxIdx) return false;
+        if (node == null) {
+            return true;
+        }
+        // Node's index must be within valid range (BST property on indices)
+        if (node.Index <= minIdx || node.Index >= maxIdx) {
+            return false;
+        }
+        // Left subtree indices < node index < right subtree indices
         return CheckBstIndices(node.Left, minIdx, node.Index) && CheckBstIndices(node.Right, node.Index, maxIdx);
     }
 
-    // Logging for Uni Submission
+    // Print Tree in standard format
     public void LogTree(string description)
     {
-        Console.WriteLine("\n=== " + description + " ===");
-        Console.WriteLine("Original array: [" + string.Join(", ", _array) + "]\n");
-
-        Console.WriteLine("Tree structure (Root at top, L=left, R=right):");
+        Console.WriteLine("\n" + description);
         PrintTree();
-
-        Console.WriteLine("\nIn-order traversal:");
+        Console.WriteLine("\nInorder traversal of the constructed tree :");
         var inorder = InOrder();
-        Console.WriteLine("[" + string.Join(", ", inorder.Select(t => t.value)) + "]");
-
-        Console.WriteLine("\nPre-order traversal:");
-        Console.WriteLine("[" + string.Join(", ", inorder.Select(t => $"({t.value}, idx={t.index})")) + "]");
-
-        var (allOk, heapOk, bstOk) = VerifyProperties();
-        Console.WriteLine("\nProperty Verification:");
-        Console.WriteLine($"- Min-heap property: {(heapOk ? "Pass" : "Fail")}");
-        Console.WriteLine($"- BST index property: {(bstOk ? "Pass" : "Fail")}");
-        Console.WriteLine($"- Cartesian Tree valid: {(allOk ? "Yes" : "No")}");
+        Console.WriteLine(string.Join(" ", inorder.Select(t => t.value)));
     }
 }
 
@@ -265,14 +222,12 @@ public class CartesianTreeRunner
         CartesianTree ct1 = new CartesianTree(arr1);
         ct1.LogTree("Example 1: Standard Cartesian Tree");
 
-        // Example 2: Stack-based vs Index-array
+        // Example 2 Larger array
         int[] arr2 = { 9, 3, 7, 1, 8, 12, 10, 20, 15, 18, 5 };
-        CartesianTree ctIndex = new CartesianTree(arr2);
-        CartesianTree ctStack = new CartesianTree(arr2) { Root = new CartesianTree(arr2).BuildStackBased() };
-        ctIndex.LogTree("Example 2: Index-array Construction");
-        ctStack.LogTree("Example 2: Stack-based Construction");
+        CartesianTree ct2 = new CartesianTree(arr2);
+        ct2.LogTree("Example 2: Stack-based Construction");
 
-        // Example 3: Range Minimum Queries
+        // Example 3 Range Minimum Queries
         int[] arr3 = { 3, 2, 6, 1, 9, 7, 8 };
         CartesianTree ct3 = new CartesianTree(arr3);
         Console.WriteLine("\n=== Example 3: Range Minimum Queries ===");
@@ -284,7 +239,7 @@ public class CartesianTreeRunner
             Console.WriteLine($"RMQ({l}, {r}) = {result} (expected: {actualMin})");
         }
 
-        // Example 4: Edge Cases
+        // Example 4 Edge Cases
         int[] sorted = { 1, 2, 3, 4, 5 };
         int[] reverseSorted = { 5, 4, 3, 2, 1 };
         CartesianTree ctSorted = new CartesianTree(sorted);
